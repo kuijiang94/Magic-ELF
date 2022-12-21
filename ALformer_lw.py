@@ -13,9 +13,48 @@ import numbers
 
 from einops import rearrange
 from Blanced_attention import BlancedAttention, BlancedAttention_CAM_SAM_ADD
-
+import math
 
 ##########################################################################
+def gelu(x):
+    """Implementation of the gelu activation function.
+        For information: OpenAI GPT's gelu is slightly different (and gives slightly different results):
+        0.5 * x * (1 + torch.tanh(math.sqrt(2 / math.pi) * (x + 0.044715 * torch.pow(x, 3))))
+        Also see https://arxiv.org/abs/1606.08415
+    """
+    return x * 0.5 * (1.0 + torch.erf(x / math.sqrt(2.0)))
+    
+def pixel_unshuffle(input, downscale_factor):
+    '''
+    input: batchSize * c * k*w * k*h
+    kdownscale_factor: k
+
+    batchSize * c * k*w * k*h -> batchSize * k*k*c * w * h
+    '''
+    c = input.shape[1]
+
+    kernel = torch.zeros(size=[downscale_factor * downscale_factor * c,
+                               1, downscale_factor, downscale_factor],
+                         device=input.device)
+    for y in range(downscale_factor):
+        for x in range(downscale_factor):
+            kernel[x + y * downscale_factor::downscale_factor*downscale_factor, 0, y, x] = 1
+    return F.conv2d(input, kernel, stride=downscale_factor, groups=c)
+
+class PixelUnshuffle(nn.Module):
+    def __init__(self, downscale_factor):
+        super(PixelUnshuffle, self).__init__()
+        self.downscale_factor = downscale_factor
+    def forward(self, input):
+        '''
+        input: batchSize * c * k*w * k*h
+        kdownscale_factor: k
+
+        batchSize * c * k*w * k*h -> batchSize * k*k*c * w * h
+        '''
+        output = pixel_unshuffle(input,self.downscale_factor)
+        return output
+        #return pixel_unshuffle(input, downscale_factor)
 ## Layer Norm
 
 def to_3d(x):
@@ -78,7 +117,7 @@ class LayerNorm(nn.Module):
 class FeedForward(nn.Module):
     def __init__(self, dim, ffn_expansion_factor, bias):
         super(FeedForward, self).__init__()
-        self.act1 = nn.PReLU()
+        #self.act1 = nn.PReLU()
         hidden_features = int(dim*ffn_expansion_factor)
 
         self.project_in = nn.Conv2d(dim, hidden_features*2, kernel_size=1, bias=bias)
@@ -90,7 +129,8 @@ class FeedForward(nn.Module):
     def forward(self, x):
         x = self.project_in(x)
         x1, x2 = self.dwconv(x).chunk(2, dim=1)
-        x = self.act1(x1) * x2
+        #x = self.act1(x1) * x2
+        x = gelu(x1) * x2
         x = self.project_out(x)
         return x
 
@@ -759,6 +799,28 @@ class Decoder(nn.Module):
     # def forward(self, x):
         # x = self.down(x)
         # return x
+        
+##########################################################################
+## Resizing modules
+# class DownSample(nn.Module):
+    # def __init__(self, n_feat):
+        # super(DownSample, self).__init__()
+
+        # #self.body = nn.Sequential(nn.Conv2d(n_feat, n_feat//2, kernel_size=3, stride=1, padding=1, bias=False),
+                                  # #nn.PixelUnShuffle(2))
+        # self.body = nn.Sequential(nn.Conv2d(n_feat, n_feat//2, kernel_size=3, stride=1, padding=1, bias=False),
+                                  # PixelUnshuffle(2))
+    # def forward(self, x):
+        # return self.body(x)
+
+# class UpSample(nn.Module):
+    # def __init__(self, n_feat):
+        # super(UpSample, self).__init__()
+
+        # self.body = nn.Sequential(nn.Conv2d(n_feat, n_feat*2, kernel_size=3, stride=1, padding=1, bias=False),
+                                  # nn.PixelShuffle(2))
+    # def forward(self, x):
+        # return self.body(x)
 
 class DownSample(nn.Module):
     def __init__(self, in_channels):
@@ -842,7 +904,7 @@ class ORB(nn.Module):
     def __init__(self, n_feat, kernel_size, reduction, act, bias, num_cab):
         super(ORB, self).__init__()
         num_blocks = num_cab
-        heads = 2
+        heads = 1
         ffn_expansion_factor = 2.66
         LayerNorm_type = 'WithBias'  ## Other option 'BiasFree'
         #modules_body = []
@@ -876,7 +938,7 @@ class DSNet(nn.Module):
 
         act=nn.PReLU()
         num_blocks = 1
-        heads = 2
+        heads = 1
         ffn_expansion_factor = 2.66
         LayerNorm_type = 'WithBias'  ## Other option 'BiasFree'
         
@@ -940,7 +1002,7 @@ class SSNet(nn.Module):
     def __init__(self, n_feat, kernel_size, reduction, act, bias, num_cab):
         super(SSNet, self).__init__()
         num_blocks = 1
-        heads = 2
+        heads = 1
         ffn_expansion_factor = 2.66
         LayerNorm_type = 'WithBias'  ## Other option 'BiasFree'
         
@@ -987,7 +1049,7 @@ class SSNet(nn.Module):
 		
 ##########################################################################
 class ALformer(nn.Module):
-    def __init__(self, in_c=3, out_c=3, n_feat=64, kernel_size=3, reduction=4, num_cab=8, bias=False):
+    def __init__(self, in_c=3, out_c=3, n_feat=32, kernel_size=3, reduction=4, num_cab=5, bias=False):
         super(ALformer, self).__init__()
 
         act=nn.PReLU()

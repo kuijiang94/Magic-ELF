@@ -876,7 +876,7 @@ class DSNet(nn.Module):
 
         act=nn.PReLU()
         num_blocks = 1
-        heads = 2
+        heads = 1
         ffn_expansion_factor = 2.66
         LayerNorm_type = 'WithBias'  ## Other option 'BiasFree'
         
@@ -940,7 +940,7 @@ class SSNet(nn.Module):
     def __init__(self, n_feat, kernel_size, reduction, act, bias, num_cab):
         super(SSNet, self).__init__()
         num_blocks = 1
-        heads = 2
+        heads = 1
         ffn_expansion_factor = 2.66
         LayerNorm_type = 'WithBias'  ## Other option 'BiasFree'
         
@@ -987,7 +987,7 @@ class SSNet(nn.Module):
 		
 ##########################################################################
 class ALformer(nn.Module):
-    def __init__(self, in_c=3, out_c=3, n_feat=64, kernel_size=3, reduction=4, num_cab=8, bias=False):
+    def __init__(self, in_c=3, out_c=3, n_feat=48, kernel_size=3, reduction=4, num_cab=10, bias=False):
         super(ALformer, self).__init__()
 
         act=nn.PReLU()

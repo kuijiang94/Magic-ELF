@@ -333,7 +333,7 @@ class STEM(nn.Module):
         
         act=nn.PReLU()
         #num_blocks = 1
-        heads = 4
+        heads = 1
         ffn_expansion_factor = 2.66
         LayerNorm_type = 'WithBias'  ## Other option 'BiasFree'
 
@@ -876,7 +876,7 @@ class DSNet(nn.Module):
 
         act=nn.PReLU()
         num_blocks = 1
-        heads = 2
+        heads = 1
         ffn_expansion_factor = 2.66
         LayerNorm_type = 'WithBias'  ## Other option 'BiasFree'
         
@@ -940,7 +940,7 @@ class SSNet(nn.Module):
     def __init__(self, n_feat, kernel_size, reduction, act, bias, num_cab):
         super(SSNet, self).__init__()
         num_blocks = 1
-        heads = 2
+        heads = 1
         ffn_expansion_factor = 2.66
         LayerNorm_type = 'WithBias'  ## Other option 'BiasFree'
         
@@ -962,32 +962,31 @@ class SSNet(nn.Module):
     def forward(self, x, DSNet_outs):
         res, backgound = DSNet_outs
 		
-        backgound_up = self.up_recon_b(backgound)
-        #res_up = self.up_recon_b(res)
+        #backgound_up = self.up_recon_b(backgound)
+        res_up = self.up_recon_b(res)
         enhance_fea = self.stem(x, res, backgound)
         
-        #former_fea = self.former(enhance_fea)
+        former_fea = self.former(enhance_fea)
         
         
-        or_fea = self.orsnet(enhance_fea)
+        or_fea = self.orsnet(former_fea)
 		
-        feassn_e = self.ssnnet_encoder(enhance_fea)
+        feassn_e = self.ssnnet_encoder(former_fea)
         feassn_d = self.ssnnet_decoder(feassn_e)
 		
         fused_fea = self.S2FB_fuse(or_fea, feassn_d)
         #fused_fea = self.S2FB_fuse(or_fea, fused_fea)
-        former_fea = self.former(fused_fea)
 		
-        deep_fea = self.deep_conv(former_fea)
+        deep_fea = self.deep_conv(fused_fea)
         #recon_up = self.up_recon(deep_fea)
         recon_up  = shuffle_up(deep_fea, 2)
         recon_res = self.tail(recon_up)
 
-        return recon_res+backgound_up#res_up
+        return recon_res+res_up
 		
 ##########################################################################
 class ALformer(nn.Module):
-    def __init__(self, in_c=3, out_c=3, n_feat=64, kernel_size=3, reduction=4, num_cab=8, bias=False):
+    def __init__(self, in_c=3, out_c=3, n_feat=64, kernel_size=3, reduction=4, num_cab=6, bias=False):
         super(ALformer, self).__init__()
 
         act=nn.PReLU()
@@ -997,6 +996,6 @@ class ALformer(nn.Module):
     def forward(self, x_img): #####b,c,h,w
         #print(x_img.shape)
         DSNet_out = self.dsnet(x_img)
-        imitation = self.ssnet(x_img, DSNet_out)
+        imitation = x_img - self.ssnet(x_img, DSNet_out)
         #print(imitation.shape)
         return [imitation, DSNet_out[1]]

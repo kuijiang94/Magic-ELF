@@ -13,9 +13,18 @@ import numbers
 
 from einops import rearrange
 from Blanced_attention import BlancedAttention, BlancedAttention_CAM_SAM_ADD
-
+import math
 
 ##########################################################################
+def gelu(x):
+    """Implementation of the gelu activation function.
+        For information: OpenAI GPT's gelu is slightly different (and gives slightly different results):
+        0.5 * x * (1 + torch.tanh(math.sqrt(2 / math.pi) * (x + 0.044715 * torch.pow(x, 3))))
+        Also see https://arxiv.org/abs/1606.08415
+    """
+    return x * 0.5 * (1.0 + torch.erf(x / math.sqrt(2.0)))
+    
+    
 ## Layer Norm
 
 def to_3d(x):
@@ -90,7 +99,8 @@ class FeedForward(nn.Module):
     def forward(self, x):
         x = self.project_in(x)
         x1, x2 = self.dwconv(x).chunk(2, dim=1)
-        x = self.act1(x1) * x2
+        #x = self.act1(x1) * x2
+        x = gelu(x1) * x2
         x = self.project_out(x)
         return x
 
@@ -876,7 +886,7 @@ class DSNet(nn.Module):
 
         act=nn.PReLU()
         num_blocks = 1
-        heads = 2
+        heads = 1
         ffn_expansion_factor = 2.66
         LayerNorm_type = 'WithBias'  ## Other option 'BiasFree'
         
@@ -940,7 +950,7 @@ class SSNet(nn.Module):
     def __init__(self, n_feat, kernel_size, reduction, act, bias, num_cab):
         super(SSNet, self).__init__()
         num_blocks = 1
-        heads = 2
+        heads = 1
         ffn_expansion_factor = 2.66
         LayerNorm_type = 'WithBias'  ## Other option 'BiasFree'
         
@@ -987,7 +997,7 @@ class SSNet(nn.Module):
 		
 ##########################################################################
 class ALformer(nn.Module):
-    def __init__(self, in_c=3, out_c=3, n_feat=64, kernel_size=3, reduction=4, num_cab=8, bias=False):
+    def __init__(self, in_c=3, out_c=3, n_feat=48, kernel_size=3, reduction=4, num_cab=10, bias=False):
         super(ALformer, self).__init__()
 
         act=nn.PReLU()
