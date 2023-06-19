@@ -1,6 +1,6 @@
 import os
 from config import Config 
-opt = Config('training_ALformer.yml')
+opt = Config('train_ALformer.yml')
 
 gpus = ','.join([str(i) for i in opt.GPU])
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
