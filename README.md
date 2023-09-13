@@ -59,7 +59,7 @@ Experiments are performed for different image processing tasks including, image 
 Code borrows from [MPRNet](https://github.com/swz30/MPRNet) by [Syed Waqas Zamir](https://scholar.google.es/citations?user=WNGPkVQAAAAJ&hl=en). Thanks for sharing !
 
 ## Citation
-If you use PCNet, please consider citing:
+If you use Magic ELF, please consider citing:
 
     @article{jiangpcnet,
         title={Magic ELF: Image Deraining Meets Association Learning and Transformer},
